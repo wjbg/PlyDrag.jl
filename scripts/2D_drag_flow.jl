@@ -1,16 +1,13 @@
 using Gridap
-using LineSearches: BackTracking
+using PlyDrag
 using Printf
 
 # -------------------------------------------------
 # Constants and Parameters
 # -------------------------------------------------
 
-include("viscosity_models.jl")
-include("utils.jl")
-
 const TEMPERATURE = 273.15 + 300.0  # Temperature [K]
-const THICKNESS = 0.001 # Domain thickness [m]
+const THICKNESS = 0.001  # Domain thickness [m]
 const TOP_VELOCITY = 1.0e-3  # Speed of the top plate [m/s]
 
 # -------------------------------------------------
@@ -44,8 +41,8 @@ dirichlet_tags = ["bottom", "top"]
 v_space = TestFESpace(
     model,
     ReferenceFE(lagrangian, Float64, order);
-    conformity=:H1,
-    dirichlet_tags=dirichlet_tags
+    conformity = :H1,
+    dirichlet_tags = dirichlet_tags,
 )
 
 g_top(x) = TOP_VELOCITY
@@ -63,7 +60,7 @@ dΩ = Measure(Ω, 2 * order)
 function a(u, v)
     γₑ = sqrt ∘ (∇(u) ⋅ ∇(u) + 1e-12)
     μ = (γ -> viscosity(PPS, γ, TEMPERATURE)) ∘ γₑ
-    return ∫(μ * (∇(u) ⋅ ∇(v)))dΩ
+    return ∫(μ * (∇(u) ⋅ ∇(v))) * dΩ
 end
 
 # -------------------------------------------------
@@ -71,11 +68,7 @@ end
 # -------------------------------------------------
 
 op = FEOperator(a, u_space, v_space)
-nls = NLSolver(
-    show_trace=true,
-    method=:newton,
-    linesearch=BackTracking()
-)
+nls = NLSolver(show_trace = true, method = :newton, linesearch = BackTracking())
 
 solver = FESolver(nls)
 
@@ -93,8 +86,8 @@ grad_uh = ∇(uh)
 τₕ = μₕ * grad_uh
 
 # Calculate average numerical shear stress
-area = sum(∫(1.0)dΩ)
-τₕ_avg = sum(∫(sqrt ∘ (τₕ ⋅ τₕ + 1e-12))dΩ) / area
+area = sum(∫(1.0) * dΩ)
+τₕ_avg = sum(∫(sqrt ∘ (τₕ ⋅ τₕ + 1e-12)) * dΩ) / area
 τₐ = analytical_shear_stress(TOP_VELOCITY, THICKNESS)
 
 # Consistent reactions
@@ -106,8 +99,8 @@ force_bottom = calculate_reaction(a, "bottom", uh, v_space, model, dirichlet_tag
 @printf("Consistent Force Top:    %.6e N/m\n", force_top)
 @printf("Consistent Force Bottom: %.6e N/m\n", force_bottom)
 
-writevtk(Ω, "2D_dragflow_flatplate", cellfields=[
-    "u" => uh,
-    "shear_rate" => γₕ,
-    "shear_stress" => τₕ
-])
+writevtk(
+    Ω,
+    "2D_dragflow_flatplate",
+    cellfields = ["u" => uh, "shear_rate" => γₕ, "shear_stress" => τₕ],
+)

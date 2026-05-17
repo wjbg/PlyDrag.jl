@@ -18,8 +18,8 @@ nominal_stress = simulate_drag_flow(
     TOP_VELOCITY,
     PPS,
     TEMPERATURE;
-    order=1,
-    quad_order=10
+    order = 1,
+    quad_order = 10,
 )
 
 @printf("\nFinal Nominal Shear Stress: %.6e Pa\n", nominal_stress)

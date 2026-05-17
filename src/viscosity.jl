@@ -11,7 +11,7 @@ abstract type TemperatureModel end
 abstract type RheologyModel end
 
 """
-    Arrhenius{T<:Real}
+    Arrhenius{T <: Real}
 
 Temperature-dependent model based on the Arrhenius equation.
 
@@ -29,13 +29,13 @@ The shift factor is defined as:
 - Commonly used to describe thermally activated processes such as
   viscosity, reaction rates, or diffusion.
 """
-Base.@kwdef struct Arrhenius{T<:Real} <: TemperatureModel
+Base.@kwdef struct Arrhenius{T <: Real} <: TemperatureModel
     A::T  # Pre-exponential factor
     E::T  # Activation energy [J/mol]
 end
 
 """
-    WLF{T<:Real}
+    WLF{T <: Real}
 
 Williams–Landel–Ferry (WLF) temperature dependence model.
 
@@ -55,7 +55,7 @@ The shift factor is defined as:
   classical WLF equation.
 - The model is typically valid near the reference temperature.
 """
-Base.@kwdef struct WLF{T<:Real} <: TemperatureModel
+Base.@kwdef struct WLF{T <: Real} <: TemperatureModel
     A::T   # Pre-exponential factor
     Tr::T  # Reference temperature [K] (e.g., glass transition temperature)
     C1::T  # Fitting factor
@@ -63,12 +63,12 @@ Base.@kwdef struct WLF{T<:Real} <: TemperatureModel
 end
 
 """
-    Constant{T<:Real}
+    Constant{T <: Real}
 
 A model that returns a constant value regardless of the temperature.
 Useful for parameters that do not depend on temperature.
 """
-Base.@kwdef struct Constant{T<:Real} <: TemperatureModel
+Base.@kwdef struct Constant{T <: Real} <: TemperatureModel
     value::T
 end
 
@@ -91,9 +91,9 @@ Evaluate the temperature-dependent shift factor at temperature `T`.
   or reaction rates.
 """
 shift_factor(model::TemperatureModel, T::Real) =
-    error("shift_factor not implemented for $(typeof(model))")
+    return error("shift_factor not implemented for $(typeof(model))")
 
-shift_factor(model::Constant, T::Real) = model.value
+shift_factor(model::Constant, T::Real) = return model.value
 
 function shift_factor(model::Arrhenius, T::Real)
     return model.A * exp(model.E / (GAS_CONSTANT * T))
@@ -104,7 +104,7 @@ function shift_factor(model::WLF, T::Real)
 end
 
 """
-    CrossModel{T<:Real, T0<:TemperatureModel, Tinf<:TemperatureModel, Tλ<:TemperatureModel}
+    CrossModel{T <: Real, T0 <: TemperatureModel, Tinf <: TemperatureModel, Tλ <: TemperatureModel}
 
 Cross rheology model with temperature-dependent parameters.
 
@@ -118,7 +118,12 @@ The viscosity is defined as:
 - `λ`: Relaxation time model
 - `n`: Power-law index [-]
 """
-Base.@kwdef struct CrossModel{T<:Real, T0<:TemperatureModel, Tinf<:TemperatureModel, Tλ<:TemperatureModel} <: RheologyModel
+Base.@kwdef struct CrossModel{
+    T <: Real,
+    T0 <: TemperatureModel,
+    Tinf <: TemperatureModel,
+    Tλ <: TemperatureModel,
+} <: RheologyModel
     η0::T0
     ηinf::Tinf
     λ::Tλ
@@ -131,7 +136,7 @@ end
 Evaluate the temperature and shear-rate-dependent viscosity.
 """
 viscosity(model::RheologyModel, γ̇::Real, T::Real) =
-    error("viscosity not implemented for $(typeof(model))")
+    return error("viscosity not implemented for $(typeof(model))")
 
 function viscosity(model::CrossModel, γ̇::Real, T::Real)
     η0 = shift_factor(model.η0, T)
@@ -150,8 +155,8 @@ end
 Cross model parameters for Polyphenylene Sulfide (PPS).
 """
 const PPS = CrossModel(
-    η0 = Arrhenius(A=1.25e-4, E=6.86e4),
-    ηinf = Constant(value=0.0),
-    λ = Arrhenius(A=2.21e-8, E=4.50e4),
-    n = 0.28
+    η0 = Arrhenius(A = 1.25e-4, E = 6.86e4),
+    ηinf = Constant(value = 0.0),
+    λ = Arrhenius(A = 2.21e-8, E = 4.50e4),
+    n = 0.28,
 )

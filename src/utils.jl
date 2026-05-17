@@ -26,7 +26,7 @@ function get_tag_index(model::DiscreteModel, tag_name::String)
             return tag
         end
     end
-    error("Tag $tag_name not found in model labels")
+    return error("Tag $tag_name not found in model labels")
 end
 
 """
@@ -77,7 +77,14 @@ other Dirichlet boundaries.
 # Returns
 - A scalar value representing the integrated reaction force (or N/m in 2D).
 """
-function calculate_reaction(a::Function, tag_name::String, u_sol, v_space::FESpace, model::DiscreteModel, dirichlet_tags)
+function calculate_reaction(
+    a::Function,
+    tag_name::String,
+    u_sol,
+    v_space::FESpace,
+    model::DiscreteModel,
+    dirichlet_tags,
+)
     # Check if tag exists
     get_tag_index(model, tag_name)
 
