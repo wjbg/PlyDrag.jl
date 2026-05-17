@@ -1,0 +1,14 @@
+# Archive
+_archive/
+
+# Latex stuff
+ltximg/
+
+# Results and Meshes
+*.vtu
+*.msh
+
+# Emacs autosave and backup files
+*~
+\#*\#
+.\#*

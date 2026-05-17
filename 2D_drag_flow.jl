@@ -6,36 +6,20 @@ using Printf
 # Constants and Parameters
 # -------------------------------------------------
 
-const GAS_CONSTANT = 8.31 # Universal gas constant [J/(mol.K)]
+include("viscosity_models.jl")
+include("utils.jl")
+
 const TEMPERATURE = 273.15 + 300.0  # Temperature [K]
 const THICKNESS = 0.001 # Domain thickness [m]
 const TOP_VELOCITY = 1.0e-3  # Speed of the top plate [m/s]
-
-const PPS_PARAMS = (
-    c_0 = 1.25e-4,  # Proportionality constant for zero-shear viscosity
-    e_0 = 6.86e4,   # Activation energy zero-shear viscosity
-    n  = 0.28,      # Powerlaw index
-    c_lambda = 2.21e-8,  # Proportionality constant for relaxation time
-    e_lambda = 4.50e4    # Activation energy relaxation time
-)
 
 # -------------------------------------------------
 # Physical Model Functions
 # -------------------------------------------------
 
-function zero_shear_viscosity(temp, params)
-    return params.c_0 * exp(params.e_0 / (GAS_CONSTANT * temp))
-end
-
-function viscosity(shear_rate, temp, params)
-    μ_0 = zero_shear_viscosity(temp, params)
-    λ = params.c_lambda * exp(params.e_lambda / (GAS_CONSTANT * temp))
-    return μ_0 / (1 + (λ * shear_rate)^(1 - params.n))
-end
-
 function analytical_shear_stress(velocity, thickness)
     γ_analytical = velocity / thickness
-    η = viscosity(γ_analytical, TEMPERATURE, PPS_PARAMS)
+    η = viscosity(PPS, γ_analytical, TEMPERATURE)
     return η * γ_analytical
 end
 
@@ -56,11 +40,12 @@ add_tag_from_tags!(labels, "top", [6, 3, 4])
 # -------------------------------------------------
 
 order = 1
+dirichlet_tags = ["bottom", "top"]
 v_space = TestFESpace(
     model,
     ReferenceFE(lagrangian, Float64, order);
     conformity=:H1,
-    dirichlet_tags=["bottom", "top"]
+    dirichlet_tags=dirichlet_tags
 )
 
 g_top(x) = TOP_VELOCITY
@@ -77,7 +62,7 @@ dΩ = Measure(Ω, 2 * order)
 
 function a(u, v)
     γₑ = sqrt ∘ (∇(u) ⋅ ∇(u) + 1e-12)
-    μ = (γ -> viscosity(γ, TEMPERATURE, PPS_PARAMS)) ∘ γₑ
+    μ = (γ -> viscosity(PPS, γ, TEMPERATURE)) ∘ γₑ
     return ∫(μ * (∇(u) ⋅ ∇(v)))dΩ
 end
 
@@ -104,7 +89,7 @@ println("Numerical solving has ended.")
 
 grad_uh = ∇(uh)
 γₕ = sqrt ∘ (grad_uh ⋅ grad_uh + 1e-12)
-μₕ = (γ -> viscosity(γ, TEMPERATURE, PPS_PARAMS)) ∘ γₕ
+μₕ = (γ -> viscosity(PPS, γ, TEMPERATURE)) ∘ γₕ
 τₕ = μₕ * grad_uh
 
 # Calculate average numerical shear stress
@@ -112,10 +97,16 @@ area = sum(∫(1.0)dΩ)
 τₕ_avg = sum(∫(sqrt ∘ (τₕ ⋅ τₕ + 1e-12))dΩ) / area
 τₐ = analytical_shear_stress(TOP_VELOCITY, THICKNESS)
 
+# Consistent reactions
+force_top = calculate_reaction(a, "top", uh, v_space, model, dirichlet_tags)
+force_bottom = calculate_reaction(a, "bottom", uh, v_space, model, dirichlet_tags)
+
 @printf("Analytical shear stress: %.1f Pa\n", τₐ)
 @printf("Numerical shear stress:  %.1f Pa\n", τₕ_avg)
+@printf("Consistent Force Top:    %.6e N/m\n", force_top)
+@printf("Consistent Force Bottom: %.6e N/m\n", force_bottom)
 
-writevtk(Ω, "carreau_flow", cellfields=[
+writevtk(Ω, "2D_dragflow_flatplate", cellfields=[
     "u" => uh,
     "shear_rate" => γₕ,
     "shear_stress" => τₕ
