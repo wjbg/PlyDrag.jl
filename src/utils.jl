@@ -1,6 +1,6 @@
 """ utils.jl
 
-This file provides utility functions for FE simulations using Gridap.jl,
+This file provides generic utility functions for FE simulations using Gridap.jl,
 including boundary tag identification and consistent reaction force
 calculations.
 """
