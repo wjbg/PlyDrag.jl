@@ -131,6 +131,30 @@ Base.@kwdef struct CrossModel{
 end
 
 """
+    ConstantViscosity{T <: Real}
+
+A rheology model that returns a constant viscosity regardless of shear rate
+or temperature.
+"""
+Base.@kwdef struct ConstantViscosity{T <: Real} <: RheologyModel
+    value::T
+end
+
+viscosity(model::ConstantViscosity, γ̇::Real, T::Real) = model.value
+
+"""
+    Newtonian{T <: TemperatureModel}
+
+A rheology model where the viscosity depends only on temperature, defined by
+a `TemperatureModel`.
+"""
+Base.@kwdef struct Newtonian{T <: TemperatureModel} <: RheologyModel
+    η::T
+end
+
+viscosity(model::Newtonian, γ̇::Real, T::Real) = shift_factor(model.η, T)
+
+"""
     viscosity(model::RheologyModel, γ̇::Real, T::Real)
 
 Evaluate the temperature and shear-rate-dependent viscosity.

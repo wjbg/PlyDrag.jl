@@ -1,33 +1,8 @@
 """ utils.jl
 
 This file provides generic utility functions for FE simulations using Gridap.jl,
-including boundary tag identification and consistent reaction force
-calculations.
+including consistent reaction force calculations.
 """
-
-using Gridap
-
-"""
-    get_tag_index(model, tag_name)
-
-Return the index of the tag with name `tag_name` in the model's face labeling.
-
-# Arguments
-- `model`: The `DiscreteModel` containing the face labeling.
-- `tag_name`: String name of the target boundary tag.
-
-# Returns
-- Integer index of the tag in `labels.tag_to_name`.
-"""
-function get_tag_index(model::DiscreteModel, tag_name::String)
-    labels = get_face_labeling(model)
-    for (tag, name) in enumerate(labels.tag_to_name)
-        if name == tag_name
-            return tag
-        end
-    end
-    return error("Tag $tag_name not found in model labels")
-end
 
 """
     create_boundary_weight(v_space, tag_name, dirichlet_tags)
@@ -58,7 +33,7 @@ function create_boundary_weight(v_space::FESpace, tag_name::String, dirichlet_ta
 end
 
 """
-    calculate_reaction(a, tag_name, u_sol, v_space, model, dirichlet_tags)
+    calculate_reaction(a, tag_name, u_sol, v_space, dirichlet_tags)
 
 Calculate the consistent reaction force on a boundary defined by `tag_name`.
 
@@ -71,7 +46,6 @@ other Dirichlet boundaries.
 - `tag_name`: Name of the boundary where the reaction is calculated.
 - `u_sol`: The FE solution.
 - `v_space`: The test FE space.
-- `model`: The discrete model.
 - `dirichlet_tags`: The list of all Dirichlet tags used when creating `v_space`.
 
 # Returns
@@ -82,15 +56,29 @@ function calculate_reaction(
     tag_name::String,
     u_sol,
     v_space::FESpace,
-    model::DiscreteModel,
     dirichlet_tags,
 )
-    # Check if tag exists
-    get_tag_index(model, tag_name)
-
     # Create the test function weight
     w = create_boundary_weight(v_space, tag_name, dirichlet_tags)
 
     # The reaction is the residual: R = -a(u, w)
     return -sum(a(u_sol, w))
+end
+
+"""
+    get_domain_dimensions(model)
+
+Calculate the dimensions of the domain (length in 1D; width and height in 2D;
+width, height, and depth in 3D).
+"""
+function get_domain_dimensions(model::DiscreteModel)
+    coords = get_grid(model).node_coords
+    D = num_point_dims(model)
+
+    dims = map(1:D) do d
+        x_min, x_max = extrema(c -> c[d], coords)
+        return x_max - x_min
+    end
+
+    return D == 1 ? dims[1] : Tuple(dims)
 end

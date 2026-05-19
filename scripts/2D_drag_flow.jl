@@ -91,8 +91,8 @@ area = sum(∫(1.0) * dΩ)
 τₐ = analytical_shear_stress(TOP_VELOCITY, THICKNESS)
 
 # Consistent reactions
-force_top = calculate_reaction(a, "top", uh, v_space, model, dirichlet_tags)
-force_bottom = calculate_reaction(a, "bottom", uh, v_space, model, dirichlet_tags)
+force_top = calculate_reaction(a, "top", uh, v_space, dirichlet_tags)
+force_bottom = calculate_reaction(a, "bottom", uh, v_space, dirichlet_tags)
 
 @printf("Analytical shear stress: %.1f Pa\n", τₐ)
 @printf("Numerical shear stress:  %.1f Pa\n", τₕ_avg)

@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "f0ec2367bdc257016aba5c109f5781aa183f6103"
+project_hash = "fa24f6e70ee0b384f11c2b3efc531dc9453fbe42"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -970,7 +970,7 @@ uuid = "eebad327-c553-4316-9ea0-9fa01ccd7688"
 version = "0.3.3"
 
 [[deps.PlyDrag]]
-deps = ["Gridap", "GridapGmsh", "LineSearches"]
+deps = ["Gridap", "GridapGmsh", "LineSearches", "Printf"]
 path = "."
 uuid = "0f556695-b5d5-466e-a17d-7a80bf14b782"
 version = "0.1.0"

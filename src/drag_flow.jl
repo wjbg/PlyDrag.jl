@@ -4,31 +4,8 @@ This file defines the core simulation logic for 2D drag flow problems,
 including solver setup, domain calculations, and post-processing.
 """
 
-using Gridap
-using GridapGmsh
-using LineSearches: BackTracking
-using Printf
-
 # drag_flow.jl
 # Logic moved to module scope
-
-"""
-    get_domain_width(model)
-
-Calculate the width of the domain based on the x-coordinates of all nodes.
-"""
-function get_domain_width(model::DiscreteModel)
-    Ω = Triangulation(model)
-    X = get_cell_coordinates(Ω)
-    x_min, x_max = Inf, -Inf
-    for cell_pts in X
-        for pt in cell_pts
-            x_min = min(x_min, pt[1])
-            x_max = max(x_max, pt[1])
-        end
-    end
-    return x_max - x_min
-end
 
 """
     solve_drag_flow(model, top_velocity, rheology, temperature; order = 1, quad_order = 10)
@@ -135,8 +112,9 @@ function simulate_drag_flow(
         quad_order = quad_order,
     )
 
-    force_top = calculate_reaction(a, "Top", uh, v_space, model, dirichlet_tags)
-    width = get_domain_width(model)
+    force_top = calculate_reaction(a, "Top", uh, v_space, dirichlet_tags)
+    dims = get_domain_dimensions(model)
+    width = dims isa Tuple ? dims[1] : dims
     nominal_stress = force_top / width
 
     vtu_name = splitext(msh_file)[1]
