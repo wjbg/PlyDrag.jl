@@ -1,14 +1,29 @@
 """ viscosity_models.jl
 
-This file defines temperature and rheology models for fluids,
-including Arrhenius and WLF temperature shift factors, and the
-Cross rheology model with temperature-dependent parameters.
-"""
+This file defines temperature and rheology models for fluids, including Arrhenius and WLF
+temperature shift factors, and the Cross rheology model with temperature-dependent
+parameters. """
 
 const GAS_CONSTANT = 8.31446261815324  # J/(mol·K)
 
 abstract type TemperatureModel end
 abstract type RheologyModel end
+
+
+
+# ================================================================
+# Temperature Models
+# ================================================================
+
+"""
+    Constant{T <: Real}
+
+A model that returns a constant value regardless of the temperature. Useful for parameters
+that do not depend on temperature.
+"""
+struct Constant{T <: Real} <: TemperatureModel
+    value::T
+end
 
 """
     Arrhenius{T <: Real}
@@ -26,8 +41,8 @@ The shift factor is defined as:
 # Notes
 - `T` must be provided in Kelvin.
 - Note that the exponent is positive.
-- Commonly used to describe thermally activated processes such as
-  viscosity, reaction rates, or diffusion.
+- Commonly used to describe thermally activated processes such as viscosity,
+  reaction rates, or diffusion.
 """
 Base.@kwdef struct Arrhenius{T <: Real} <: TemperatureModel
     A::T  # Pre-exponential factor
@@ -51,25 +66,14 @@ The shift factor is defined as:
 
 # Notes
 - `T` must be provided in Kelvin.
-- The formulation uses base-10 exponentials, consistent with the
+- Note that the formulation uses base-10 exponentials, consistent with the
   classical WLF equation.
-- The model is typically valid near the reference temperature.
 """
 Base.@kwdef struct WLF{T <: Real} <: TemperatureModel
     A::T   # Pre-exponential factor
     Tr::T  # Reference temperature [K] (e.g., glass transition temperature)
     C1::T  # Fitting factor
     C2::T  # Fitting factor
-end
-
-"""
-    Constant{T <: Real}
-
-A model that returns a constant value regardless of the temperature.
-Useful for parameters that do not depend on temperature.
-"""
-Base.@kwdef struct Constant{T <: Real} <: TemperatureModel
-    value::T
 end
 
 """
@@ -90,21 +94,31 @@ Evaluate the temperature-dependent shift factor at temperature `T`.
 - The returned value is typically used to scale viscosity, relaxation time,
   or reaction rates.
 """
-shift_factor(model::TemperatureModel, T::Real) =
+function shift_factor(model::TemperatureModel, T::Real)
     return error("shift_factor not implemented for $(typeof(model))")
+end
 
-shift_factor(model::Constant, T::Real) = return model.value
+shift_factor(model::Constant, T::Real) = model.value
 
 function shift_factor(model::Arrhenius, T::Real)
     return model.A * exp(model.E / (GAS_CONSTANT * T))
 end
 
 function shift_factor(model::WLF, T::Real)
-    return model.A * 10^((-model.C1 * (T - model.Tr)) / (model.C2 + (T - model.Tr)))
+    return model.A * exp10((-model.C1 * (T - model.Tr)) / (model.C2 + (T - model.Tr)))
 end
 
+(model::TemperatureModel)(T::Real) = shift_factor(model, T)
+
+# ================================================================
+# Rheology Models
+# ================================================================
+
 """
-    CrossModel{T <: Real, T0 <: TemperatureModel, Tinf <: TemperatureModel, Tλ <: TemperatureModel}
+    CrossModel{T <: Real,
+               T0 <: TemperatureModel,
+               Tinf <: TemperatureModel,
+               Tλ <: TemperatureModel}
 
 Cross rheology model with temperature-dependent parameters.
 
@@ -119,10 +133,10 @@ The viscosity is defined as:
 - `n`: Power-law index [-]
 """
 Base.@kwdef struct CrossModel{
-    T <: Real,
     T0 <: TemperatureModel,
     Tinf <: TemperatureModel,
     Tλ <: TemperatureModel,
+    T <: Real,
 } <: RheologyModel
     η0::T0
     ηinf::Tinf
