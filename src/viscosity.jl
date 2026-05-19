@@ -77,42 +77,52 @@ Base.@kwdef struct WLF{T <: Real} <: TemperatureModel
 end
 
 """
-    shift_factor(model::TemperatureModel, T::Real)
+    (model::TemperatureModel)(T)
 
-Evaluate the temperature-dependent shift factor at temperature `T`.
+Evaluate the temperature-dependent scaling factor `a_T` at temperature `T`.
+
+This function implements the universal interface for all temperature models.
+It returns a multiplicative factor used to scale material properties such as
+viscosity, relaxation time, or other thermally activated quantities.
 
 # Arguments
-- `model`: Temperature model (e.g. `Arrhenius`, `WLF`, `Constant`)
-- `T`: Temperature [K]
+- `model`: temperature dependence model (e.g. `Arrhenius`, `WLF`, `Constant`)
+- `T`: temperature in Kelvin
 
 # Returns
-- Multiplicative factor used to scale material response (e.g. viscosity
-  or relaxation time)
+- Dimensionless or model-specific scaling factor `a_T(T)`
 
 # Notes
-- `T` must be given in Kelvin.
-- The returned value is typically used to scale viscosity, relaxation time,
-  or reaction rates.
+All temperature models must implement this interface.
 """
-function shift_factor(model::TemperatureModel, T::Real)
-    return error("shift_factor not implemented for $(typeof(model))")
+function (model::TemperatureModel)(T::Real)
+    return error("Temperature shift not implemented for $(typeof(model))")
 end
 
-shift_factor(model::Constant, T::Real) = model.value
+(model::Constant)(T::Real) = model.value
 
-function shift_factor(model::Arrhenius, T::Real)
+function (model::Arrhenius)(T::Real)
     return model.A * exp(model.E / (GAS_CONSTANT * T))
 end
 
-function shift_factor(model::WLF, T::Real)
+function (model::WLF)(T::Real)
     return model.A * exp10((-model.C1 * (T - model.Tr)) / (model.C2 + (T - model.Tr)))
 end
 
-(model::TemperatureModel)(T::Real) = shift_factor(model, T)
 
 # ================================================================
 # Rheology Models
 # ================================================================
+
+"""
+    Newtonian{T <: TemperatureModel}
+
+A rheology model where the viscosity depends only on temperature, defined by
+a `TemperatureModel`.
+"""
+struct Newtonian{Tη <: TemperatureModel} <: RheologyModel
+    η::Tη
+end
 
 """
     CrossModel{T <: Real,
@@ -132,60 +142,55 @@ The viscosity is defined as:
 - `λ`: Relaxation time model
 - `n`: Power-law index [-]
 """
-Base.@kwdef struct CrossModel{
-    T0 <: TemperatureModel,
-    Tinf <: TemperatureModel,
-    Tλ <: TemperatureModel,
-    T <: Real,
-} <: RheologyModel
-    η0::T0
-    ηinf::Tinf
-    λ::Tλ
-    n::T
+Base.@kwdef struct CrossModel <: RheologyModel
+    η0::TemperatureModel
+    ηinf::TemperatureModel
+    λ::TemperatureModel
+    n::Float64
 end
 
 """
-    ConstantViscosity{T <: Real}
+    (model::RheologyModel)(γ̇, T)
 
-A rheology model that returns a constant viscosity regardless of shear rate
-or temperature.
+Evaluate the viscosity of a rheological model at shear rate `γ̇` and temperature `T`.
+
+This is the primary constitutive interface for all rheology models. It returns the
+viscosity η(γ̇, T) as defined by the specific model implementation.
+
+# Arguments
+- `γ̇`: shear rate
+- `T`: temperature in Kelvin
+
+# Returns
+- Viscosity η(γ̇, T)
+
+# Notes
+All rheology models must implement this interface.
 """
-Base.@kwdef struct ConstantViscosity{T <: Real} <: RheologyModel
-    value::T
-end
-
-viscosity(model::ConstantViscosity, γ̇::Real, T::Real) = model.value
-
-"""
-    Newtonian{T <: TemperatureModel}
-
-A rheology model where the viscosity depends only on temperature, defined by
-a `TemperatureModel`.
-"""
-Base.@kwdef struct Newtonian{T <: TemperatureModel} <: RheologyModel
-    η::T
-end
-
-viscosity(model::Newtonian, γ̇::Real, T::Real) = shift_factor(model.η, T)
-
-"""
-    viscosity(model::RheologyModel, γ̇::Real, T::Real)
-
-Evaluate the temperature and shear-rate-dependent viscosity.
-"""
-viscosity(model::RheologyModel, γ̇::Real, T::Real) =
+function (model::RheologyModel)(γ̇::Real, T::Real)
     return error("viscosity not implemented for $(typeof(model))")
-
-function viscosity(model::CrossModel, γ̇::Real, T::Real)
-    η0 = shift_factor(model.η0, T)
-    ηinf = shift_factor(model.ηinf, T)
-    λ = shift_factor(model.λ, T)
-    return ηinf + (η0 - ηinf) / (1 + (λ * γ̇)^(1 - model.n))
 end
 
-# -------------------------------------------------
-# Predefined Models
-# -------------------------------------------------
+(model::Newtonian)(γ̇::Real, T::Real) = model.η(T)
+
+function (model::CrossModel)(γ̇::Real, T::Real)
+    η0 = model.η0(T)
+    ηinf = model.ηinf(T)
+    λ = model.λ(T)
+    x = max(λ * γ̇, 0)
+    return ηinf + (η0 - ηinf) / (1 + x^(1 - model.n))
+end
+
+"""
+    η(model::RheologyModel, γ̇::Real, T::Real)
+
+Convenience function for the viscosity.
+"""
+η(model::RheologyModel, γ̇::Real, T::Real) = model(γ̇, T)
+
+# ================================================================
+# Predefined models
+# ================================================================
 
 """
     PPS
