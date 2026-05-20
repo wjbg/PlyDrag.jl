@@ -188,6 +188,7 @@ Convenience function for the viscosity.
 """
 η(model::RheologyModel, γ̇::Real, T::Real) = model(γ̇, T)
 
+
 # ================================================================
 # Predefined models
 # ================================================================
@@ -199,7 +200,7 @@ Cross model parameters for Polyphenylene Sulfide (PPS).
 """
 const PPS = CrossModel(
     η0 = Arrhenius(A = 1.25e-4, E = 6.86e4),
-    ηinf = Constant(value = 0.0),
+    ηinf = Constant(0.0),
     λ = Arrhenius(A = 2.21e-8, E = 4.50e4),
     n = 0.28,
 )
