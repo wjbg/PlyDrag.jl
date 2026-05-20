@@ -10,7 +10,6 @@ abstract type TemperatureModel end
 abstract type RheologyModel end
 
 
-
 # ================================================================
 # Temperature Models
 # ================================================================
@@ -193,14 +192,14 @@ Convenience function for the viscosity.
 # Predefined models
 # ================================================================
 
-"""
-    PPS
+# """
+#     PPS
 
-Cross model parameters for Polyphenylene Sulfide (PPS).
-"""
-const PPS = CrossModel(
-    η0 = Arrhenius(A = 1.25e-4, E = 6.86e4),
-    ηinf = Constant(0.0),
-    λ = Arrhenius(A = 2.21e-8, E = 4.50e4),
-    n = 0.28,
-)
+# Cross model parameters for Polyphenylene Sulfide (PPS).
+# """
+# const PPS = CrossModel(
+#     η0 = Arrhenius(A = 1.25e-4, E = 6.86e4),
+#     ηinf = Constant(0.0),
+#     λ = Arrhenius(A = 2.21e-8, E = 4.50e4),
+#     n = 0.28,
+# )
