@@ -29,23 +29,22 @@ end
 
 Temperature-dependent model based on the Arrhenius equation.
 
-The shift factor is defined as:
+The model is defined as:
 
-    A * exp(E / (R * T))
+    A(T) = Aref * exp( (E / R) * (1/T - 1/Tref) ),
+
+with `A` the property of interest at reference temperature `Tref`.
 
 # Fields
-- `A`: Pre-exponential factor (dimension depends on application)
+- `Aref`: Pre-exponential factor at reference temperature (dimension depends on
+          application)
+- `Tref`: Reference temperature [K]
 - `E`: Activation energy [J/mol]
-
-# Notes
-- `T` must be provided in Kelvin.
-- Note that the exponent is positive.
-- Commonly used to describe thermally activated processes such as viscosity,
-  reaction rates, or diffusion.
 """
 Base.@kwdef struct Arrhenius{T <: Real} <: TemperatureModel
-    A::T  # Pre-exponential factor
-    E::T  # Activation energy [J/mol]
+    Aref::T  # Pre-exponential factor at reference temperature
+    Tref::T  # Reference temperature [K]
+    E::T     # Activation energy [J/mol]
 end
 
 """
@@ -53,9 +52,9 @@ end
 
 Williams–Landel–Ferry (WLF) temperature dependence model.
 
-The shift factor is defined as:
+The model is defined as:
 
-    A * 10^(-C1 * (T - Tr) / (C2 + (T - Tr)))
+    val(T) = A * 10^(-C1 * (T - Tr) / (C2 + (T - Tr)))
 
 # Fields
 - `A`: Pre-exponential factor (dimension depends on application)
@@ -78,18 +77,18 @@ end
 """
     (model::TemperatureModel)(T)
 
-Evaluate the temperature-dependent scaling factor `a_T` at temperature `T`.
+Evaluate the temperature-dependent value of the modeled quantity at temperature `T`.
 
 This function implements the universal interface for all temperature models.
-It returns a multiplicative factor used to scale material properties such as
-viscosity, relaxation time, or other thermally activated quantities.
+It returns the value of a material property (e.g. viscosity, relaxation time)
+as a function of temperature.
 
 # Arguments
 - `model`: temperature dependence model (e.g. `Arrhenius`, `WLF`, `Constant`)
 - `T`: temperature in Kelvin
 
 # Returns
-- Dimensionless or model-specific scaling factor `a_T(T)`
+- Value of the modeled property at temperature `T`
 
 # Notes
 All temperature models must implement this interface.
@@ -101,7 +100,7 @@ end
 (model::Constant)(T::Real) = model.value
 
 function (model::Arrhenius)(T::Real)
-    return model.A * exp(model.E / (GAS_CONSTANT * T))
+    return model.Aref * exp( (model.E / GAS_CONSTANT) * (1/T - 1/model.Tref) )
 end
 
 function (model::WLF)(T::Real)
@@ -120,32 +119,87 @@ A rheology model where the viscosity depends only on temperature, defined by
 a `TemperatureModel`.
 """
 struct Newtonian{Tη <: TemperatureModel} <: RheologyModel
-    η::Tη
+    η0::Tη
 end
 
 """
-    CrossModel{T <: Real,
-               T0 <: TemperatureModel,
-               Tinf <: TemperatureModel,
-               Tλ <: TemperatureModel}
+    PowerLaw{TK <: TemperatureModel, Tn <: Real}
 
-Cross rheology model with temperature-dependent parameters.
+Power-law (Ostwald–de Waele) rheology model.
 
 The viscosity is defined as:
 
-    η(γ̇, T) = ηinf(T) + (η0(T) - ηinf(T)) / (1 + (λ(T) * γ̇)^(1 - n))
+    η(γ̇, T) = K(T) * γ̇^(n - 1)
 
 # Fields
-- `η0`: Zero-shear viscosity model
-- `ηinf`: Infinite-shear viscosity model
-- `λ`: Relaxation time model
+- `K`: Consistency index model [Pa·sⁿ]
+- `n`: Flow behavior index [-]
+"""
+Base.@kwdef struct PowerLaw{TK <: TemperatureModel, Tn <: Real} <: RheologyModel
+    K::TK
+    n::Tn
+end
+
+"""
+    CrossModel
+
+Cross rheology model where viscosity is defined as:
+
+    η(γ̇, T) = ηinf(T) + (η0(T) - ηinf(T)) / (1 + (η0(T) * γ̇/τ)^(1 - n))
+
+# Fields
+- `η0`: Temperature-dependent zero-shear viscosity model [Pa⋅s]
+- `ηinf`: Temperature-dependent infinite-shear viscosity model [Pa⋅s]
+- `τ`: Shear stress at onset of shear-thinning [Pa]
 - `n`: Power-law index [-]
 """
 Base.@kwdef struct CrossModel <: RheologyModel
     η0::TemperatureModel
     ηinf::TemperatureModel
+    τ::Float64
+    n::Float64
+end
+
+"""
+    Carreau
+
+Carreau rheology model where viscosity is defined as:
+
+    η(γ̇, T) = ηinf(T) + (η0(T) - ηinf(T)) * (1 + (λ(T) * γ̇)^2)^((n - 1)/2)
+
+# Fields
+- `η0`: Temperature-dependent zero-shear viscosity model [Pa·s]
+- `ηinf`: Temperature-dependent infinite-shear viscosity model [Pa·s]
+- `λ`: Temperature-dependent time constant model [s]
+- `n`: Power-law index [-]
+"""
+Base.@kwdef struct Carreau <: RheologyModel
+    η0::TemperatureModel
+    ηinf::TemperatureModel
     λ::TemperatureModel
     n::Float64
+end
+
+"""
+    CarreauYasuda
+
+Carreau–Yasuda rheology model where viscosity is defined as:
+
+    η(γ̇, T) = ηinf(T) + (η0(T) - ηinf(T)) * (1 + (λ(T) * γ̇)^a)^((n - 1)/a)
+
+# Fields
+- `η0`: Temperature-dependent zero-shear viscosity model viscosity model [Pa·s]
+- `ηinf`: Temperature-dependent infinite-shear viscosity model [Pa·s]
+- `λ`: Temperature-dependent time constant model [s]
+- `n`: Power-law index [-]
+- `a`: Yasuda parameter [-]
+"""
+struct CarreauYasuda <: RheologyModel
+    η0::TemperatureModel
+    ηinf::TemperatureModel
+    λ::TemperatureModel
+    n::Float64
+    a::Float64
 end
 
 """
@@ -157,7 +211,7 @@ This is the primary constitutive interface for all rheology models. It returns t
 viscosity η(γ̇, T) as defined by the specific model implementation.
 
 # Arguments
-- `γ̇`: shear rate
+- `γ̇`: shear rate (must be ≥ 0)
 - `T`: temperature in Kelvin
 
 # Returns
@@ -170,36 +224,31 @@ function (model::RheologyModel)(γ̇::Real, T::Real)
     return error("viscosity not implemented for $(typeof(model))")
 end
 
-(model::Newtonian)(γ̇::Real, T::Real) = model.η(T)
+(model::Newtonian)(γ̇::Real, T::Real) = model.η0(T)
 
-function (model::CrossModel)(γ̇::Real, T::Real)
-    η0 = model.η0(T)
-    ηinf = model.ηinf(T)
-    λ = model.λ(T)
-    x = max(λ * γ̇, 0)
-    return ηinf + (η0 - ηinf) / (1 + x^(1 - model.n))
+function (model::PowerLaw)(γ̇::Real, T::Real)
+    K = model.K(T)
+    return K * γ̇^(model.n - 1)
 end
 
-"""
-    η(model::RheologyModel, γ̇::Real, T::Real)
+function (model::CrossModel)(γ̇::Real, T::Real)
+    η0, ηinf = model.η0(T), model.ηinf(T)
+    return ηinf + (η0 - ηinf) / (1 + (η0 * γ̇ / model.τ)^(1 - model.n))
+end
 
-Convenience function for the viscosity.
-"""
-η(model::RheologyModel, γ̇::Real, T::Real) = model(γ̇, T)
+function (model::Carreau)(γ̇::Real, T::Real)
+    η0, ηinf, λ = model.η0(T), model.ηinf(T), model.λ(T)
+    return ηinf + (η0 - ηinf) * (1 + (λ * γ̇)^2)^((model.n - 1) / 2)
+end
+
+function (model::CarreauYasuda)(γ̇::Real, T::Real)
+    η0, ηinf, λ = model.η0(T), model.ηinf(T), model.λ(T)
+    return ηinf + (η0 - ηinf) * (1 + (λ * γ̇)^model.a)^((model.n - 1) / model.a)
+end
 
 
 # ================================================================
 # Predefined models
 # ================================================================
 
-# """
-#     PPS
-
-# Cross model parameters for Polyphenylene Sulfide (PPS).
-# """
-# const PPS = CrossModel(
-#     η0 = Arrhenius(A = 1.25e-4, E = 6.86e4),
-#     ηinf = Constant(0.0),
-#     λ = Arrhenius(A = 2.21e-8, E = 4.50e4),
-#     n = 0.28,
-# )
+# To be added later.
