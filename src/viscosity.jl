@@ -1,8 +1,9 @@
 """ viscosity_models.jl
 
 This file defines temperature and rheology models for fluids, including Arrhenius and WLF
-temperature shift factors, and the Cross rheology model with temperature-dependent
-parameters. """
+temperature-dependent models, and the Cross rheology model with temperature-dependent
+parameters.
+"""
 
 const GAS_CONSTANT = 8.31446261815324  # J/(mol·K)
 
@@ -94,7 +95,7 @@ as a function of temperature.
 All temperature models must implement this interface.
 """
 function (model::TemperatureModel)(T::Real)
-    return error("Temperature shift not implemented for $(typeof(model))")
+    return error("Temperature model not implemented for $(typeof(model))")
 end
 
 (model::Constant)(T::Real) = model.value
@@ -141,7 +142,7 @@ Base.@kwdef struct PowerLaw{TK <: TemperatureModel, Tn <: Real} <: RheologyModel
 end
 
 """
-    CrossModel
+    Cross{Tη0 <: TemperatureModel, Tηinf <: TemperatureModel}
 
 Cross rheology model where viscosity is defined as:
 
@@ -153,15 +154,16 @@ Cross rheology model where viscosity is defined as:
 - `τ`: Shear stress at onset of shear-thinning [Pa]
 - `n`: Power-law index [-]
 """
-Base.@kwdef struct CrossModel <: RheologyModel
-    η0::TemperatureModel
-    ηinf::TemperatureModel
+Base.@kwdef struct Cross{Tη0 <: TemperatureModel,
+                         Tηinf <: TemperatureModel} <: RheologyModel
+    η0::Tη0
+    ηinf::Tηinf
     τ::Float64
     n::Float64
 end
 
 """
-    Carreau
+    Carreau{Tη0 <: TemperatureModel, Tηinf <: TemperatureModel, Tλ <: TemperatureModel}
 
 Carreau rheology model where viscosity is defined as:
 
@@ -173,31 +175,35 @@ Carreau rheology model where viscosity is defined as:
 - `λ`: Temperature-dependent time constant model [s]
 - `n`: Power-law index [-]
 """
-Base.@kwdef struct Carreau <: RheologyModel
-    η0::TemperatureModel
-    ηinf::TemperatureModel
-    λ::TemperatureModel
+Base.@kwdef struct Carreau{Tη0 <: TemperatureModel,
+                           Tηinf <: TemperatureModel,
+                           Tλ <: TemperatureModel} <: RheologyModel
+    η0::Tη0
+    ηinf::Tηinf
+    λ::Tλ
     n::Float64
 end
 
 """
-    CarreauYasuda
+    CarreauYasuda{Tη0 <: TemperatureModel, Tηinf <: TemperatureModel, Tλ <: TemperatureModel}
 
 Carreau–Yasuda rheology model where viscosity is defined as:
 
     η(γ̇, T) = ηinf(T) + (η0(T) - ηinf(T)) * (1 + (λ(T) * γ̇)^a)^((n - 1)/a)
 
 # Fields
-- `η0`: Temperature-dependent zero-shear viscosity model viscosity model [Pa·s]
+- `η0`: Temperature-dependent zero-shear viscosity model [Pa·s]
 - `ηinf`: Temperature-dependent infinite-shear viscosity model [Pa·s]
 - `λ`: Temperature-dependent time constant model [s]
 - `n`: Power-law index [-]
 - `a`: Yasuda parameter [-]
 """
-struct CarreauYasuda <: RheologyModel
-    η0::TemperatureModel
-    ηinf::TemperatureModel
-    λ::TemperatureModel
+struct CarreauYasuda{Tη0 <: TemperatureModel,
+                     Tηinf <: TemperatureModel,
+                     Tλ <: TemperatureModel} <: RheologyModel
+    η0::Tη0
+    ηinf::Tηinf
+    λ::Tλ
     n::Float64
     a::Float64
 end
@@ -231,7 +237,7 @@ function (model::PowerLaw)(γ̇::Real, T::Real)
     return K * γ̇^(model.n - 1)
 end
 
-function (model::CrossModel)(γ̇::Real, T::Real)
+function (model::Cross)(γ̇::Real, T::Real)
     η0, ηinf = model.η0(T), model.ηinf(T)
     return ηinf + (η0 - ηinf) / (1 + (η0 * γ̇ / model.τ)^(1 - model.n))
 end
@@ -251,4 +257,71 @@ end
 # Predefined models
 # ================================================================
 
-# To be added later.
+"""
+    PEEK
+
+Cross rheology model for the temperature-dependent viscosity of PEEK,
+with Arrhenius-type temperature dependence, as measured and fitted by Pierik.
+
+# Usage
+- `η = PEEK(γ̇, T)`
+
+# Arguments
+- `γ̇`: Shear rate [1/s], must be non-negative
+- `T`: Temperature [K]
+
+# Returns
+- `η`: Viscosity [Pa⋅s]
+"""
+PEEK = Cross(
+    η0 = Arrhenius(Aref=733.67, Tref=370.0+273.15, E=5.57E4),
+    ηinf = Constant(0.0),
+    τ = 6.05E4,
+    n = 0.38
+)
+
+"""
+    LMPAEK
+
+Cross rheology model for the temperature-dependent viscosity of LM-PAEK,
+with Arrhenius-type temperature dependence, as measured and fitted by Pierik.
+
+# Usage
+- `η = LMPAEK(γ̇, T)`
+
+# Arguments
+- `γ̇`: Shear rate [1/s], must be non-negative
+- `T`: Temperature [K]
+
+# Returns
+- `η`: Viscosity [Pa⋅s]
+"""
+LMPAEK = Cross(
+    η0 = Arrhenius(Aref=681.90, Tref=345.0+273.15, E=5.13E4),
+    ηinf = Constant(0.0),
+    τ = 2.53E5,
+    n = 0.42
+)
+
+"""
+    PPS
+
+Cross rheology model for the temperature-dependent viscosity of PPS,
+with Arrhenius-type temperature dependence, as measured and by Grouve.
+
+# Usage
+- `η = PPS(γ̇, T)`
+
+# Arguments
+- `γ̇`: Shear rate [1/s], must be non-negative
+- `T`: Temperature [K]
+
+# Returns
+- `η`: Viscosity [Pa⋅s]
+"""
+PPS = Cross(
+    η0 = Arrhenius(Aref=223.21, Tref=300.0+273.15, E=6.86E4),
+    ηinf = Constant(0.0),
+    τ = 7.41E5,
+    n = 0.28
+)
