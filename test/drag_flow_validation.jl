@@ -10,6 +10,8 @@ using Test
     W = 0.1 * H        # Width [m]
     T = 273.15 + 300.0 # Temperature [K]
     V_top = 1.0e-3     # Velocity [m/s]
+
+    rheology(γ) = PPS(γ, T)
     
     # -------------------------------------------------
     # Mesh and Labels
@@ -25,15 +27,15 @@ using Test
     # -------------------------------------------------
     # Solve
     # -------------------------------------------------
-    uh, a, v_space, dirichlet_tags = solve_drag_flow(
-        model, V_top, PPS, T; order = 1, quad_order = 4
+    uh, a, V, dirichlet_tags = solve_drag_flow(
+        model, V_top, rheology; order = 1, quad_order = 4
     )
 
     # -------------------------------------------------
     # Analytical Comparison
     # -------------------------------------------------
     γ_analytical = V_top / H
-    η_analytical = viscosity(PPS, γ_analytical, T)
+    η_analytical = rheology(γ_analytical)
     τ_analytical = η_analytical * γ_analytical
 
     # Numerical post-processing
@@ -42,7 +44,7 @@ using Test
     
     grad_uh = ∇(uh)
     γₕ = sqrt ∘ (grad_uh ⋅ grad_uh + 1e-12)
-    μₕ = (γ -> viscosity(PPS, γ, T)) ∘ γₕ
+    μₕ = (γ -> rheology(γ)) ∘ γₕ
     τₕ = μₕ * γₕ
 
     # Average numerical values
@@ -55,8 +57,8 @@ using Test
     @test τ_avg ≈ τ_analytical rtol=1e-6
 
     # Consistent reactions
-    force_top = calculate_reaction(a, "Top", uh, v_space, dirichlet_tags)
-    force_bottom = calculate_reaction(a, "Bottom", uh, v_space, dirichlet_tags)
+    force_top = calculate_reaction(a, "Top", uh, V, dirichlet_tags)
+    force_bottom = calculate_reaction(a, "Bottom", uh, V, dirichlet_tags)
 
     # force_top should be τ * width (magnitude)
     @test abs(force_top) ≈ τ_analytical * W rtol=1e-4

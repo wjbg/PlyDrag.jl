@@ -14,9 +14,11 @@ const TOP_VELOCITY = 1.0e-3  # Speed of the top plate [m/s]
 # Physical Model Functions
 # -------------------------------------------------
 
+rheology_model(γ) = PPS(γ, TEMPERATURE)
+
 function analytical_shear_stress(velocity, thickness)
     γ_analytical = velocity / thickness
-    η = viscosity(PPS, γ_analytical, TEMPERATURE)
+    η = rheology_model(γ_analytical)
     return η * γ_analytical
 end
 
@@ -59,7 +61,7 @@ dΩ = Measure(Ω, 2 * order)
 
 function a(u, v)
     γₑ = sqrt ∘ (∇(u) ⋅ ∇(u) + 1e-12)
-    μ = (γ -> viscosity(PPS, γ, TEMPERATURE)) ∘ γₑ
+    μ = (γ -> rheology_model(γ)) ∘ γₑ
     return ∫(μ * (∇(u) ⋅ ∇(v))) * dΩ
 end
 
@@ -82,7 +84,7 @@ println("Numerical solving has ended.")
 
 grad_uh = ∇(uh)
 γₕ = sqrt ∘ (grad_uh ⋅ grad_uh + 1e-12)
-μₕ = (γ -> viscosity(PPS, γ, TEMPERATURE)) ∘ γₕ
+μₕ = (γ -> rheology_model(γ)) ∘ γₕ
 τₕ = μₕ * grad_uh
 
 # Calculate average numerical shear stress

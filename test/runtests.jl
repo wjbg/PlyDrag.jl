@@ -24,15 +24,16 @@ using Test
     end
 
     @testset "Viscosity Models" begin
-        # Constant viscosity
-        @test viscosity(ConstantViscosity(value=10.0), 1.0, 300.0) ≈ 10.0
+        # Constant viscosity via Newtonian model
+        model_constant = Newtonian(Constant(10.0))
+        @test model_constant(1.0, 300.0) ≈ 10.0
         
         # Newtonian (temperature dependent)
-        model_newtonian = Newtonian(η = Arrhenius(A=1.0, E=0.0))
-        @test viscosity(model_newtonian, 1.0, 300.0) ≈ 1.0
+        model_newtonian = Newtonian(Arrhenius(Aref=1.0, Tref=300.0, E=0.0))
+        @test model_newtonian(1.0, 300.0) ≈ 1.0
 
         # PPS (Cross + Arrhenius/WLF)
-        η = viscosity(PPS, 1.0, 300.0)
+        η = PPS(1.0, 300.0)
         @test η > 0
     end
 
