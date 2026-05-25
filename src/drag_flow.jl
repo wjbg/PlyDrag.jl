@@ -50,7 +50,7 @@ function setup_spaces(
 end
 
 """
-    setup_drag_flow_weak_form(model::DiscreteModel, rheology; quad_order = 10)
+    longitudinal_bulk_weak_form(model::DiscreteModel, rheology; quad_order = 4)
 
 Create the default bulk weak form functional for the drag flow problem.
 
@@ -62,12 +62,12 @@ approximation, assuming a nonlinear viscosity dependent on the shear rate.
 - `rheology`: A function `η(γ)` that returns viscosity given a shear rate.
 
 # Keywords
-- `quad_order`: The integration quadrature order (default: 10).
+- `quad_order`: The integration quadrature order (default: 4).
 
 # Returns
 - `a(u, v)`: A functional representing the weak form `∫(μ(∇u) * ∇u ⋅ ∇v) dΩ`.
 """
-function setup_drag_flow_weak_form(model::DiscreteModel, rheology; quad_order = 10)
+function longitudinal_bulk_weak_form(model::DiscreteModel, rheology; quad_order = 4)
     Ω = Triangulation(model)
     dΩ = Measure(Ω, quad_order)
 
@@ -76,6 +76,7 @@ function setup_drag_flow_weak_form(model::DiscreteModel, rheology; quad_order = 
         μ = (γ -> rheology(γ)) ∘ γₑ
         return ∫(μ * (∇(u) ⋅ ∇(v))) * dΩ
     end
+
     return a
 end
 
@@ -124,7 +125,7 @@ end
 
 """
     solve_drag_flow(model::DiscreteModel, top_velocity::Real, rheology;
-                    order = 1, quad_order = 10)
+                    order = 1, quad_order = 4)
 
 Orchestrate the setup and solving of a 2D drag flow problem.
 
@@ -138,7 +139,7 @@ It modularly calls space setup, weak form construction, and the nonlinear solver
 
 # Keywords
 - `order`: FE polynomial order (default: 1).
-- `quad_order`: Quadrature order (default: 10).
+- `quad_order`: Quadrature order (default: 4).
 
 # Returns
 - `uh`: The solution field.
@@ -151,7 +152,7 @@ function solve_drag_flow(
     top_velocity::Real,
     rheology;
     order = 1,
-    quad_order = 10,
+    quad_order = 4,
 )
     dirichlet_tags = ["Bottom", "Top"]
     U, V = setup_spaces(
@@ -160,7 +161,7 @@ function solve_drag_flow(
         dirichlet_tags = dirichlet_tags,
         dirichlet_vals = [0.0, top_velocity],
     )
-    a = setup_drag_flow_weak_form(model, rheology; quad_order = quad_order)
+    a = longitudinal_bulk_weak_form(model, rheology; quad_order = quad_order)
     op = setup_drag_flow_operator(U, V, a)
     uh = solve_nonlinear_stokes(op)
 
@@ -168,7 +169,7 @@ function solve_drag_flow(
 end
 
 """
-    write_drag_flow_vtk(uh, model::DiscreteModel, rheology, filename; quad_order = 10)
+    write_drag_flow_vtk(uh, model::DiscreteModel, rheology, filename; quad_order = 4)
 
 Compute derived fields (shear rate, stress, viscosity) and export to VTK format.
 
@@ -179,14 +180,14 @@ Compute derived fields (shear rate, stress, viscosity) and export to VTK format.
 - `filename`: Target path for the VTU file (without extension).
 
 # Keywords
-- `quad_order`: Quadrature order used for field calculations (default: 10).
+- `quad_order`: Quadrature order used for field calculations (default: 4).
 """
 function write_drag_flow_vtk(
     uh,
     model::DiscreteModel,
     rheology,
     filename::String;
-    quad_order = 10,
+    quad_order = 4,
 )
     Ω = Triangulation(model)
     grad_uh = ∇(uh)
@@ -208,7 +209,7 @@ end
 
 """
     simulate_drag_flow(msh_file::String, top_velocity::Real, rheology;
-                       order = 1, quad_order = 10)
+                       order = 1, quad_order = 4)
 
 Run a complete drag flow simulation starting from a Gmsh file.
 
@@ -223,7 +224,7 @@ at the top boundary.
 
 # Keywords
 - `order`: FE polynomial order (default: 1).
-- `quad_order`: Quadrature order (default: 10).
+- `quad_order`: Quadrature order (default: 4).
 
 # Returns
 - `nominal_stress`: The integrated reaction force at the top boundary divided
@@ -234,7 +235,7 @@ function simulate_drag_flow(
     top_velocity::Real,
     rheology;
     order = 1,
-    quad_order = 10,
+    quad_order = 4,
 )
     model = GmshDiscreteModel(msh_file)
 
