@@ -39,7 +39,7 @@ function setup_spaces(
         model,
         ReferenceFE(lagrangian, Float64, order);
         conformity = :H1,
-        dirichlet_tags = dirichlet_tags
+        dirichlet_tags = dirichlet_tags,
     )
 
     # Convert numeric values to functions if necessary
@@ -50,7 +50,12 @@ function setup_spaces(
 end
 
 """
-    longitudinal_bulk_weak_form(model::DiscreteModel, rheology; quad_order = 4)
+    longitudinal_bulk_weak_form(
+        model::DiscreteModel,
+        rheology;
+        quad_order = 4,
+        regularization = 1e-12,
+    )
 
 Create the default bulk weak form functional for the drag flow problem.
 
@@ -63,16 +68,23 @@ approximation, assuming a nonlinear viscosity dependent on the shear rate.
 
 # Keywords
 - `quad_order`: The integration quadrature order (default: 4).
+- `regularization`: Regularization constant to prevent division by zero at zero shear
+                    (default: 1e-12).
 
 # Returns
 - `a(u, v)`: A functional representing the weak form `∫(μ(∇u) * ∇u ⋅ ∇v) dΩ`.
 """
-function longitudinal_bulk_weak_form(model::DiscreteModel, rheology; quad_order = 4)
+function longitudinal_bulk_weak_form(
+    model::DiscreteModel,
+    rheology;
+    quad_order = 4,
+    regularization = 1e-12,
+)
     Ω = Triangulation(model)
     dΩ = Measure(Ω, quad_order)
 
     function a(u, v)
-        γₑ = sqrt ∘ (∇(u) ⋅ ∇(u) + 1e-12)
+        γₑ = sqrt ∘ (∇(u) ⋅ ∇(u) + regularization)
         μ = (γ -> rheology(γ)) ∘ γₑ
         return ∫(μ * (∇(u) ⋅ ∇(v))) * dΩ
     end
@@ -124,8 +136,15 @@ function solve_nonlinear_stokes(op; show_trace = true)
 end
 
 """
-    solve_drag_flow(model::DiscreteModel, top_velocity::Real, rheology;
-                    order = 1, quad_order = 4)
+    solve_drag_flow(
+        model::DiscreteModel,
+        top_velocity::Real,
+        rheology;
+        order = 1,
+        quad_order = 4,
+        dirichlet_tags = ["Bottom", "Top"],
+        regularization = 1e-12,
+    )
 
 Orchestrate the setup and solving of a 2D drag flow problem.
 
@@ -140,6 +159,10 @@ It modularly calls space setup, weak form construction, and the nonlinear solver
 # Keywords
 - `order`: FE polynomial order (default: 1).
 - `quad_order`: Quadrature order (default: 4).
+- `dirichlet_tags`: Vector of boundary tags for Dirichlet conditions
+                    (default: ["Bottom", "Top"]).
+- `regularization`: Regularization constant to prevent division by zero at zero shear
+                    (default: 1e-12).
 
 # Returns
 - `uh`: The solution field.
@@ -153,15 +176,21 @@ function solve_drag_flow(
     rheology;
     order = 1,
     quad_order = 4,
+    dirichlet_tags = ["Bottom", "Top"],
+    regularization = 1e-12,
 )
-    dirichlet_tags = ["Bottom", "Top"]
     U, V = setup_spaces(
         model;
         order = order,
         dirichlet_tags = dirichlet_tags,
         dirichlet_vals = [0.0, top_velocity],
     )
-    a = longitudinal_bulk_weak_form(model, rheology; quad_order = quad_order)
+    a = longitudinal_bulk_weak_form(
+        model,
+        rheology;
+        quad_order = quad_order,
+        regularization = regularization,
+    )
     op = setup_drag_flow_operator(U, V, a)
     uh = solve_nonlinear_stokes(op)
 
@@ -169,7 +198,13 @@ function solve_drag_flow(
 end
 
 """
-    write_drag_flow_vtk(uh, model::DiscreteModel, rheology, filename; quad_order = 4)
+    write_drag_flow_vtk(
+        uh,
+        model::DiscreteModel,
+        rheology,
+        filename;
+        regularization = 1e-12,
+    )
 
 Compute derived fields (shear rate, stress, viscosity) and export to VTK format.
 
@@ -180,18 +215,19 @@ Compute derived fields (shear rate, stress, viscosity) and export to VTK format.
 - `filename`: Target path for the VTU file (without extension).
 
 # Keywords
-- `quad_order`: Quadrature order used for field calculations (default: 4).
+- `regularization`: Regularization constant to prevent division by zero at zero shear
+                    (default: 1e-12).
 """
 function write_drag_flow_vtk(
     uh,
     model::DiscreteModel,
     rheology,
     filename::String;
-    quad_order = 4,
+    regularization = 1e-12,
 )
     Ω = Triangulation(model)
     grad_uh = ∇(uh)
-    γₕ = sqrt ∘ (grad_uh ⋅ grad_uh + 1e-12)
+    γₕ = sqrt ∘ (grad_uh ⋅ grad_uh + regularization)
     μₕ = (γ -> rheology(γ)) ∘ γₕ
     τₕ = μₕ * grad_uh
 
@@ -208,8 +244,15 @@ function write_drag_flow_vtk(
 end
 
 """
-    simulate_drag_flow(msh_file::String, top_velocity::Real, rheology;
-                       order = 1, quad_order = 4)
+    simulate_drag_flow(
+        msh_file::String,
+        top_velocity::Real,
+        rheology;
+        order = 1,
+        quad_order = 4,
+        dirichlet_tags = ["Bottom", "Top"],
+        regularization = 1e-12,
+    )
 
 Run a complete drag flow simulation starting from a Gmsh file.
 
@@ -225,6 +268,10 @@ at the top boundary.
 # Keywords
 - `order`: FE polynomial order (default: 1).
 - `quad_order`: Quadrature order (default: 4).
+- `dirichlet_tags`: Vector of boundary tags for Dirichlet conditions
+                    (default: ["Bottom", "Top"]).
+- `regularization`: Regularization constant to prevent division by zero at zero shear
+                    (default: 1e-12).
 
 # Returns
 - `nominal_stress`: The integrated reaction force at the top boundary divided
@@ -236,19 +283,23 @@ function simulate_drag_flow(
     rheology;
     order = 1,
     quad_order = 4,
+    dirichlet_tags = ["Bottom", "Top"],
+    regularization = 1e-12,
 )
     model = GmshDiscreteModel(msh_file)
 
     println("Solving drag flow for $msh_file...")
-    uh, a, V, dirichlet_tags = solve_drag_flow(
+    uh, a, V, dirichlet_tags_out = solve_drag_flow(
         model,
         top_velocity,
         rheology;
         order = order,
         quad_order = quad_order,
+        dirichlet_tags = dirichlet_tags,
+        regularization = regularization,
     )
 
-    force_top = calculate_reaction(a, "Top", uh, V, dirichlet_tags)
+    force_top = calculate_reaction(a, dirichlet_tags_out[2], uh, V, dirichlet_tags_out)
     dims = get_domain_dimensions(model)
     width = dims isa Tuple ? dims[1] : dims
     nominal_stress = force_top / width
@@ -259,7 +310,7 @@ function simulate_drag_flow(
         model,
         rheology,
         vtu_name;
-        quad_order = quad_order,
+        regularization = regularization,
     )
 
     println("Simulation finished. Nominal stress: $nominal_stress")
