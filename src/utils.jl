@@ -72,7 +72,7 @@ Calculate the dimensions of the domain (length in 1D; width and height in 2D;
 width, height, and depth in 3D).
 """
 function get_domain_dimensions(model::DiscreteModel)
-    coords = get_grid(model).node_coords
+    coords = get_grid(model).node_coordinates
     D = num_point_dims(model)
 
     dims = map(1:D) do d

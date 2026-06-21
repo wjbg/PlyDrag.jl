@@ -305,6 +305,7 @@ function simulate_drag_flow(
     nominal_stress = force_top / width
 
     vtu_name = splitext(msh_file)[1]
+    println("Writing solution to $vtu_name...")
     write_drag_flow_vtk(
         uh,
         model,

@@ -8,7 +8,7 @@ using Printf
 # Exported types and functions
 export TemperatureModel, RheologyModel
 export Arrhenius, WLF, Constant
-export PPS, Newtonian
+export PPS, PEEK, LMPAEK, Newtonian
 
 export calculate_reaction
 export get_domain_dimensions, solve_drag_flow, write_drag_flow_vtk, simulate_drag_flow
