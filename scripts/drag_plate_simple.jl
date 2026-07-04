@@ -1,6 +1,17 @@
+"""
+    drag_plate_simple.jl
+
+Solves 2D drag flow between two plates to validate solver. Domain height and and top plate
+velocity are provided as input, as well as the temperature and a rheological model. Solution
+is compared to analytical solution.
+
+"""
+
 using Gridap
+using LineSearches: BackTracking
 using PlyDrag
 using Printf
+using RheoModels
 
 # -------------------------------------------------
 # Constants and Parameters
@@ -96,13 +107,15 @@ area = sum(∫(1.0) * dΩ)
 force_top = calculate_reaction(a, "top", uh, v_space, dirichlet_tags)
 force_bottom = calculate_reaction(a, "bottom", uh, v_space, dirichlet_tags)
 
+# Print details
 @printf("Analytical shear stress: %.1f Pa\n", τₐ)
 @printf("Numerical shear stress:  %.1f Pa\n", τₕ_avg)
 @printf("Consistent Force Top:    %.6e N/m\n", force_top)
 @printf("Consistent Force Bottom: %.6e N/m\n", force_bottom)
 
+# Store velocity field
 writevtk(
     Ω,
-    "2D_dragflow_flatplate",
+    "drag_plate_simple",
     cellfields = ["u" => uh, "shear_rate" => γₕ, "shear_stress" => τₕ],
 )

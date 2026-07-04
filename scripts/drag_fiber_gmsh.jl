@@ -1,29 +1,33 @@
 using PlyDrag
 using Printf
+using RheoModels
 
 # -------------------------------------------------
 # Constants and Parameters
 # -------------------------------------------------
 
-const TEMPERATURE = 273.15 + 300.0  # Temperature [K]
+const TEMPERATURE = 273.15 + 365.0  # Temperature [K]
 const TOP_VELOCITY = 1.0e-3  # Speed of the top plate [m/s]
-const MSH_FILE = "../meshes/2D_rectangle.msh"
+const MSH_FILE = "../meshes/2D_unstructured_hexagonal_packing_vf0.50_n20.msh"
+# const MSH_FILE = "../meshes/2D_unstructured_two_quarter_fiber_vf0.50_n20.msh"
 
 # Note: The mesh should have `Top` and `Bottom` identifiers, which should also include
 #       the respective corner points!
 
-PPS300(γ̇) = PPS(γ̇, TEMPERATURE)
+rheomodel(γ̇) = LMPAEK(γ̇, TEMPERATURE)
 
 # -------------------------------------------------
 # Run Simulation
 # -------------------------------------------------
 
-nominal_stress = simulate_drag_flow(
+nominal_stress, uh, model = simulate_drag_flow(
     MSH_FILE,
     TOP_VELOCITY,
-    PPS300,
+    rheomodel,
     order = 1,
     quad_order = 10,
 )
 
 @printf("\nFinal Nominal Shear Stress: %.6e Pa\n", nominal_stress)
+
+# write_drag_flow_solution(uh, model, rheomodel, "test")

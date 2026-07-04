@@ -23,19 +23,5 @@ using Test
         @test all(d ≈ 1.0 for d in dims_3d)
     end
 
-    @testset "Viscosity Models" begin
-        # Constant viscosity via Newtonian model
-        model_constant = Newtonian(Constant(10.0))
-        @test model_constant(1.0, 300.0) ≈ 10.0
-        
-        # Newtonian (temperature dependent)
-        model_newtonian = Newtonian(Arrhenius(Aref=1.0, Tref=300.0, E=0.0))
-        @test model_newtonian(1.0, 300.0) ≈ 1.0
-
-        # PPS (Cross + Arrhenius/WLF)
-        η = PPS(1.0, 300.0)
-        @test η > 0
-    end
-
     include("drag_flow_validation.jl")
 end

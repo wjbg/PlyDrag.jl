@@ -254,11 +254,11 @@ end
         regularization = 1e-12,
     )
 
-Run a complete drag flow simulation starting from a Gmsh file.
+Solve a drag flow simulation starting from a Gmsh mesh file and return the
+nominal shear stress.
 
-This high-level function handles model loading, solving, reaction force
-calculation, and VTK output. It returns the nominal shear stress calculated
-at the top boundary.
+This function handles model loading, solving, and reaction force calculation.
+To also write the solution to a VTK file, use `write_drag_flow_solution`.
 
 # Arguments
 - `msh_file`: Path to the `.msh` file.
@@ -276,6 +276,8 @@ at the top boundary.
 # Returns
 - `nominal_stress`: The integrated reaction force at the top boundary divided
   by the domain width.
+- `uh`: The FE velocity solution field.
+- `model`: The discrete model loaded from `msh_file`.
 """
 function simulate_drag_flow(
     msh_file::String,
@@ -304,16 +306,38 @@ function simulate_drag_flow(
     width = dims isa Tuple ? dims[1] : dims
     nominal_stress = force_top / width
 
-    vtu_name = splitext(msh_file)[1]
-    println("Writing solution to $vtu_name...")
-    write_drag_flow_vtk(
+    println("Simulation finished. Nominal stress: $nominal_stress")
+    return nominal_stress, uh, model
+end
+
+"""
+    write_drag_flow_solution(
         uh,
         model,
         rheology,
-        vtu_name;
-        regularization = regularization,
+        vtu_file::String;
+        regularization = 1e-12,
     )
 
-    println("Simulation finished. Nominal stress: $nominal_stress")
-    return nominal_stress
+Write a drag flow solution to a VTK file.
+
+# Arguments
+- `uh`: The FE velocity solution field (as returned by `simulate_drag_flow`).
+- `model`: The discrete model (as returned by `simulate_drag_flow`).
+- `rheology`: Viscosity function `η(γ)`.
+- `vtu_file`: Output filename (without `.vtu` extension).
+
+# Keywords
+- `regularization`: Regularization constant used during the solve (default: 1e-12).
+"""
+function write_drag_flow_solution(
+    uh,
+    model,
+    rheology,
+    vtu_file::String;
+    regularization = 1e-12,
+)
+    println("Writing solution to $vtu_file...")
+    write_drag_flow_vtk(uh, model, rheology, vtu_file; regularization = regularization)
 end
+
